@@ -1,0 +1,17 @@
+*.json
+*.sh
+log.txt
+.DS_Store
+/class
+__pycache__/filedownload.cpython-313.pyc
+__pycache__/general.cpython-313.pyc
+__pycache__/webclass.cpython-313.pyc
+ign
+*.key
+userdata.txt
+SAMLResponce.txt
+z.bat
+cookies.txt
+/jss
+__pycache__/auth_token.cpython-313.pyc
+__pycache__/settings.cpython-313.pyc
