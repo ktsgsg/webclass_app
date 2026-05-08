@@ -2,7 +2,7 @@ import urllib.parse
 import requests
 import json
 import re
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, NavigableString
 
 webclassurl = "https://rpwebcls.meijo-u.ac.jp"
 
@@ -43,15 +43,19 @@ def _getacs(source_text: str) -> str:
 
 
 def _crawl_course(href_el, cookies) -> dict:
-    text = href_el.get_text()
-    slot = _parse_slot(text)
-    name = text.lstrip("» ").strip()
+    full_text = href_el.get_text()
+    slot = _parse_slot(full_text)
+    name_node = next(
+        (s for s in href_el.children if isinstance(s, NavigableString) and s.strip()),
+        None,
+    )
+    name = name_node.strip().lstrip("» ") if name_node else full_text.strip()
     course_url = webclassurl + href_el["href"]
 
     try:
         source = requests.get(course_url, cookies=cookies)
         acspath = _getacs(source.text)
-        real_url = webclassurl + "/webclass/" + acspath
+        real_url = webclassurl + acspath
         source = requests.get(real_url, cookies=cookies)
 
         soup = BeautifulSoup(source.text, "html.parser")

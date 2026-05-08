@@ -3,11 +3,13 @@
   export let selected    // 現在選択中のノード
   export let onSelect    // (node) => void
 
-  // 展開状態: "course-{i}" / "section-{i}-{j}" をキーに管理
-  let expanded = {}
+  // 展開状態を Set で管理（Svelte のリアクティビティ確実化のため再代入）
+  let expandedKeys = new Set()
 
   function toggle(key) {
-    expanded[key] = !expanded[key]
+    const next = new Set(expandedKeys)
+    next.has(key) ? next.delete(key) : next.add(key)
+    expandedKeys = next
   }
 
   function selectNode(node) {
@@ -38,12 +40,12 @@
           class:error={!!course.error}
           on:click={() => toggle(`course-${ci}`)}
         >
-          <span class="chevron">{expanded[`course-${ci}`] ? '▾' : '▸'}</span>
+          <span class="chevron">{expandedKeys.has(`course-${ci}`) ? '▾' : '▸'}</span>
           <span class="slot-badge">{course.slot || '–'}</span>
           <span class="course-name">{course.name}</span>
         </button>
 
-        {#if expanded[`course-${ci}`]}
+        {#if expandedKeys.has(`course-${ci}`)}
           {#if course.error}
             <div class="error-msg">取得エラー: {course.error}</div>
           {:else}
@@ -54,11 +56,11 @@
                   class="tree-row section-row"
                   on:click={() => toggle(`section-${ci}-${si}`)}
                 >
-                  <span class="chevron">{expanded[`section-${ci}-${si}`] ? '▾' : '▸'}</span>
+                  <span class="chevron">{expandedKeys.has(`section-${ci}-${si}`) ? '▾' : '▸'}</span>
                   <span class="section-name">{section.name}</span>
                 </button>
 
-                {#if expanded[`section-${ci}-${si}`]}
+                {#if expandedKeys.has(`section-${ci}-${si}`)}
                   {#each section.contents as content}
                     <button
                       class="tree-row content-row"

@@ -50,5 +50,31 @@ WebClass（名城大学LMS）の資料・課題をネイティブデスクトッ
 - 認証情報は `key.key` / `userdata.txt` に保存（.gitignore 済み）
 - `structure.json` も .gitignore 済み
 
+---
+
+### [Phase 5] クローラーバグ修正
+**ブランチ:** `main`
+**目的:** ツリー展開できない根本原因の修正
+
+**発見した問題:**
+1. **URL二重パス**: `_crawl_course` の `real_url = webclassurl + "/webclass/" + acspath` が
+   `acspath` にすでに `/webclass/course.php/...` が含まれるため
+   `https://rpwebcls.meijo-u.ac.jp/webclass//webclass/course.php/...` となり 404 → `sections: []`
+2. **コース名にバッジテキスト混入**: `href_el.get_text()` が `新着メッセージ(3)` 等の
+   子要素テキストを含めてしまう
+
+**修正内容 (`webclass/crawler.py`):**
+- `real_url = webclassurl + acspath` に変更（`/webclass/` 二重を除去）
+- `NavigableString` で最初のテキストノードのみ取り出すよう変更
+- `from bs4 import BeautifulSoup, NavigableString` に import 追加
+
+**結果:** ✅ sections が正しく取得できることを確認（アルゴリズム・データ構造: 5 sections 等）
+
+---
+
 ## 失敗記録
-_失敗した実装はここに記録する_
+
+### TreePanel.svelte 展開不具合（Svelte リアクティビティ）
+**原因:** `isOpen(key)` のような通常関数経由で `expandedKeys` を参照すると、
+Svelte コンパイラがリアクティブ依存として追跡できない。
+**対策:** テンプレート内で `expandedKeys.has(...)` を直接記述する。
