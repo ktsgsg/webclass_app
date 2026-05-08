@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "postinstall": "node -e \"const {cpSync,mkdirSync}=require('fs');mkdirSync('public',{recursive:true});cpSync('node_modules/pdfjs-dist/standard_fonts','public/standard_fonts',{recursive:true});cpSync('node_modules/pdfjs-dist/cmaps','public/cmaps',{recursive:true});\""
   },
   "devDependencies": {
     "@sveltejs/vite-plugin-svelte": "^1.0.1",

@@ -16,7 +16,12 @@
     if (!bytes || !container) return
     container.innerHTML = ''
     try {
-      const loadingTask = pdfjsLib.getDocument({ data: bytes.slice() })
+      const loadingTask = pdfjsLib.getDocument({
+        data: bytes.slice(),
+        standardFontDataUrl: '/standard_fonts/',
+        cMapUrl: '/cmaps/',
+        cMapPacked: true,
+      })
       pdfDoc = await loadingTask.promise
       for (let i = 1; i <= pdfDoc.numPages; i++) {
         const page = await pdfDoc.getPage(i)
