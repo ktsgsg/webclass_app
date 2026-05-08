@@ -10,6 +10,10 @@ export function DownloadPDF(arg1, arg2) {
   return window['go']['main']['App']['DownloadPDF'](arg1, arg2);
 }
 
+export function FetchPDF(arg1) {
+  return window['go']['main']['App']['FetchPDF'](arg1);
+}
+
 export function GetCacheDir() {
   return window['go']['main']['App']['GetCacheDir']();
 }

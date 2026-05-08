@@ -6,6 +6,8 @@ export function CheckCredentials():Promise<boolean>;
 
 export function DownloadPDF(arg1:string,arg2:string):Promise<void>;
 
+export function FetchPDF(arg1:string):Promise<Array<number>>;
+
 export function GetCacheDir():Promise<string>;
 
 export function GetTree():Promise<main.Tree>;

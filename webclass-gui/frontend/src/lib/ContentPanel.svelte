@@ -1,20 +1,16 @@
 <script>
   import { FetchPDF } from '../../wailsjs/go/main/App.js'
+  import PdfViewer from './PdfViewer.svelte'
 
   export let node  // 選択されたコンテンツノード
 
   let loading = false
-  let pdfUrl = null
+  let pdfBytes = null
   let error = ''
-  let prevUrl = null
 
-  // ノードが変わったら前回の Blob URL を解放してリセット
+  // ノードが変わったらリセット
   $: if (node) {
-    if (prevUrl) {
-      URL.revokeObjectURL(prevUrl)
-      prevUrl = null
-    }
-    pdfUrl = null
+    pdfBytes = null
     error = ''
     loading = false
   }
@@ -23,14 +19,11 @@
     loading = true
     error = ''
     try {
-      const bytes = await FetchPDF(query)
-      // Wails は []byte を base64 文字列で返す
-      const binary = atob(bytes)
+      const b64 = await FetchPDF(query)
+      const binary = atob(b64)
       const arr = new Uint8Array(binary.length)
       for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i)
-      const blob = new Blob([arr], { type: 'application/pdf' })
-      pdfUrl = URL.createObjectURL(blob)
-      prevUrl = pdfUrl
+      pdfBytes = arr
     } catch (e) {
       error = 'PDFの取得に失敗しました: ' + e
     } finally {
@@ -60,8 +53,8 @@
   {:else if node.type === 'assignment'}
     <div class="assignment-view">
       <h2>📝 {node.name}</h2>
-      {#if pdfUrl}
-        <iframe title={node.name} src={pdfUrl} class="pdf-frame"></iframe>
+      {#if pdfBytes}
+        <PdfViewer bytes={pdfBytes} />
       {:else}
         <button class="btn-primary" on:click={() => openPDF(node.download_query)} disabled={loading}>
           {loading ? '取得中...' : 'PDFを表示'}
@@ -73,8 +66,8 @@
   {:else if node.type === 'textbook'}
     <div class="textbook-view">
       <h2>📄 {node.name}</h2>
-      {#if pdfUrl}
-        <iframe title={node.name} src={pdfUrl} class="pdf-frame"></iframe>
+      {#if pdfBytes}
+        <PdfViewer bytes={pdfBytes} />
       {:else}
         <ul class="chapter-list">
           {#each node.items as item, i}
@@ -131,13 +124,6 @@
     font-size: 1.1rem;
     color: #e5e7eb;
     font-weight: 600;
-  }
-
-  .pdf-frame {
-    flex: 1;
-    border: none;
-    border-radius: 6px;
-    background: #1f2937;
   }
 
   .btn-primary {
