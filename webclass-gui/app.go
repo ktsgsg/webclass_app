@@ -1,0 +1,170 @@
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
+)
+
+// App struct
+type App struct {
+	ctx     context.Context
+	python  string
+	cliPath string
+}
+
+// --- ツリー構造の型定義（Python cli.py の出力と対応）---
+
+type Item struct {
+	Chapter string `json:"chapter"`
+	Query   string `json:"query"`
+}
+
+type Content struct {
+	ID            string `json:"id,omitempty"`
+	Name          string `json:"name"`
+	Type          string `json:"type"`
+	Items         []Item `json:"items,omitempty"`
+	DownloadQuery string `json:"download_query,omitempty"`
+	URL           string `json:"url,omitempty"`
+	Reason        string `json:"reason,omitempty"`
+}
+
+type Section struct {
+	Name     string    `json:"name"`
+	Contents []Content `json:"contents"`
+}
+
+type Course struct {
+	Slot     string    `json:"slot"`
+	Name     string    `json:"name"`
+	URL      string    `json:"url"`
+	Sections []Section `json:"sections"`
+	Error    string    `json:"error,omitempty"`
+}
+
+type Tree struct {
+	Courses []Course `json:"courses"`
+}
+
+// ---
+
+func NewApp() *App {
+	return &App{}
+}
+
+func (a *App) startup(ctx context.Context) {
+	a.ctx = ctx
+	a.resolvePaths()
+}
+
+// resolvePaths は Python 実行ファイルと cli.py のパスを解決する。
+// wails dev では cwd が webclass-gui/ になるため、プロジェクトルートは ../
+func (a *App) resolvePaths() {
+	cwd, _ := os.Getwd()
+	projectRoot := filepath.Join(cwd, "..")
+
+	venvPython := filepath.Join(projectRoot, ".venv", "bin", "python3")
+	if _, err := os.Stat(venvPython); err == nil {
+		a.python = venvPython
+	} else {
+		a.python = "python3"
+	}
+
+	a.cliPath = filepath.Join(projectRoot, "webclass", "cli.py")
+}
+
+func (a *App) runCLI(args ...string) ([]byte, error) {
+	cmdArgs := append([]string{a.cliPath}, args...)
+	cmd := exec.Command(a.python, cmdArgs...)
+	cmd.Dir = filepath.Dir(a.cliPath)
+	out, err := cmd.Output()
+	if err != nil {
+		if exitErr, ok := err.(*exec.ExitError); ok {
+			return nil, fmt.Errorf("%w\nstderr: %s", err, string(exitErr.Stderr))
+		}
+		return nil, err
+	}
+	return out, nil
+}
+
+// CheckCredentials は認証情報が保存済みかどうかを返す
+func (a *App) CheckCredentials() bool {
+	cmd := exec.Command(a.python, a.cliPath, "check-credentials")
+	cmd.Dir = filepath.Dir(a.cliPath)
+	return cmd.Run() == nil
+}
+
+// SetCredentials はユーザーIDとパスワードを暗号化保存する
+func (a *App) SetCredentials(userid, password string) error {
+	_, err := a.runCLI("set-credentials", "--userid", userid, "--password", password)
+	return err
+}
+
+// GetTree はコース構造ツリーを返す（クロールに数分かかる場合あり）
+func (a *App) GetTree() (*Tree, error) {
+	out, err := a.runCLI("tree")
+	if err != nil {
+		return nil, fmt.Errorf("tree 取得エラー: %w", err)
+	}
+	var tree Tree
+	if err := json.Unmarshal(out, &tree); err != nil {
+		return nil, fmt.Errorf("JSON パースエラー: %w\n出力: %.200s", err, string(out))
+	}
+	return &tree, nil
+}
+
+// DownloadPDF は指定クエリの PDF をローカルに保存する
+func (a *App) DownloadPDF(query, savePath string) error {
+	_, err := a.runCLI("download", "--query", query, "--path", savePath)
+	return err
+}
+
+// GetSaveDir は PDF 保存先のベースディレクトリを返す
+func (a *App) GetSaveDir() string {
+	home, _ := os.UserHomeDir()
+	return filepath.Join(home, "Documents", "WebClass")
+}
+
+// sanitize はファイル名に使えない文字を _ に置換する
+func sanitize(s string) string {
+	result := make([]rune, 0, len(s))
+	for _, r := range s {
+		switch {
+		case r == '/' || r == '\\' || r == ':' || r == '*' ||
+			r == '?' || r == '"' || r == '<' || r == '>' || r == '|':
+			result = append(result, '_')
+		default:
+			result = append(result, r)
+		}
+	}
+	return string(result)
+}
+
+// FetchPDF は PDF をバイト列で返す。
+// ~/Documents/WebClass/<contentName>/<fileName>.pdf にキャッシュし、
+// 存在すればそれを読み込み、なければダウンロードして保存する。
+func (a *App) FetchPDF(query, contentName, fileName string) ([]byte, error) {
+	dir := filepath.Join(a.GetSaveDir(), sanitize(contentName))
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, err
+	}
+	savePath := filepath.Join(dir, sanitize(fileName)+".pdf")
+
+	if data, err := os.ReadFile(savePath); err == nil && len(data) >= 4 && string(data[:4]) == "%PDF" {
+		return data, nil
+	}
+
+	if _, err := a.runCLI("download", "--query", query, "--path", savePath); err != nil {
+		return nil, err
+	}
+	return os.ReadFile(savePath)
+}
+
+// ClearSavedPDFs は保存済みPDFを全削除する
+func (a *App) ClearSavedPDFs() error {
+	return os.RemoveAll(a.GetSaveDir())
+}
