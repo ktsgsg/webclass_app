@@ -70,15 +70,26 @@
         <PdfViewer bytes={pdfBytes} />
       {:else}
         <ul class="chapter-list">
-          {#each node.items as item, i}
+          {#each node.items as item}
             <li>
-              <button
-                class="chapter-btn"
-                on:click={() => openPDF(item.query, node.name, item.chapter)}
-                disabled={loading}
-              >
-                {item.chapter}
-              </button>
+              {#if item.item_type === 'pdf'}
+                <button
+                  class="chapter-btn"
+                  on:click={() => openPDF(item.query, node.name, item.chapter)}
+                  disabled={loading}
+                >
+                  📄 {item.chapter}
+                </button>
+              {:else if item.item_type === 'html'}
+                <details class="chapter-html">
+                  <summary>{item.chapter}</summary>
+                  <div class="html-content">{@html item.html_content}</div>
+                </details>
+              {:else if item.item_type === 'attachment'}
+                <div class="chapter-attachment">
+                  📎 {item.chapter} <span class="badge">添付ファイル（未対応）</span>
+                </div>
+              {/if}
             </li>
           {/each}
         </ul>
@@ -192,6 +203,59 @@
     color: #9ca3af;
     font-size: 0.83rem;
     margin: 0;
+  }
+
+  .chapter-html {
+    width: 100%;
+    border: 1px solid #374151;
+    border-radius: 6px;
+    overflow: hidden;
+  }
+
+  .chapter-html summary {
+    padding: 0.6rem 0.9rem;
+    background: #1f2937;
+    color: #d1d5db;
+    font-size: 0.87rem;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .chapter-html summary:hover {
+    background: #374151;
+  }
+
+  .html-content {
+    padding: 0.8rem 1rem;
+    background: #0d1117;
+    color: #d1d5db;
+    font-size: 0.85rem;
+    line-height: 1.6;
+    white-space: pre-wrap;
+    word-break: break-all;
+    font-family: 'SF Mono', 'Menlo', monospace;
+    max-height: 400px;
+    overflow-y: auto;
+  }
+
+  .chapter-attachment {
+    padding: 0.6rem 0.9rem;
+    background: #1f2937;
+    color: #9ca3af;
+    border: 1px solid #374151;
+    border-radius: 6px;
+    font-size: 0.87rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .badge {
+    font-size: 0.72rem;
+    background: #374151;
+    color: #6b7280;
+    padding: 0.1rem 0.4rem;
+    border-radius: 3px;
   }
 
   .error-view h2 {

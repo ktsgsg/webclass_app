@@ -143,8 +143,37 @@ def _parse_assignment(soup, cookies, name, content_id) -> dict:
     }
 
 
+def _classify_textbook_item(query: str, cookies) -> dict:
+    """txtbk_show_text.php の内容を分類して item_type と追加情報を返す。
+    - "pdf":        loadit.php リンクあり
+    - "html":       <div class="contenttxt"> に本文テキスト
+    - "attachment": 添付ファイルあり（リンク不明）
+    """
+    qs = urllib.parse.parse_qs(urllib.parse.urlparse(query).query)
+    file_val = qs.get("file", [""])[0]
+
+    # file パラメータが非空なら PDF と判断（追加フェッチ不要）
+    if file_val:
+        return {"item_type": "pdf"}
+
+    # file が空の場合はページ取得して本文を見る
+    r = requests.get(webclassurl + query, cookies=cookies)
+    soup = BeautifulSoup(r.text, "html.parser")
+    contenttxt = soup.find("div", class_="contenttxt")
+    if not contenttxt:
+        return {"item_type": "html", "html_content": ""}
+
+    text = contenttxt.get_text().strip()
+    if "このページには添付ファイルがあります" in text:
+        return {"item_type": "attachment"}
+
+    # HTML / コード本文をそのまま保持
+    return {"item_type": "html", "html_content": str(contenttxt)}
+
+
 def _parse_textbook(soup, cookies, name, content_id) -> dict:
-    """テキスト資料コンテンツ: 章ごとの download_query リストを保持"""
+    """テキスト資料コンテンツ: 章ごとのアイテムリストを返す。
+    各アイテムに item_type ("pdf" | "html" | "attachment") を付与する。"""
     chapter_src = soup.find("frame", {"name": "webclass_chapter"}).attrs["src"].replace("&amp;", "&")
     chapter_url = webclassurl + "/webclass/" + chapter_src
     resp = requests.get(chapter_url, cookies=cookies)
@@ -157,6 +186,9 @@ def _parse_textbook(soup, cookies, name, content_id) -> dict:
     items = []
     for i in range(len(text_urls)):
         chapter_name = chapters[i * 2].get_text() + "," + chapters[i * 2 + 1].get_text()
-        items.append({"chapter": chapter_name, "query": text_urls[str(i + 1)]})
+        query = text_urls[str(i + 1)]
+        item = {"chapter": chapter_name, "query": query}
+        item.update(_classify_textbook_item(query, cookies))
+        items.append(item)
 
     return {"id": content_id, "name": name, "type": "textbook", "items": items}
