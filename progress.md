@@ -16,54 +16,31 @@ WebClass（名城大学LMS）の資料・課題をネイティブデスクトッ
 
 ### [Phase 1] Python CLI 整備
 **ブランチ:** `feature/python-cli`
-**目的:** `main.py` を CLI として整備し、`--output json` で構造ツリーを stdout 出力できるようにする
+**PR:** https://github.com/ktsgsg/webclass_app/pull/1
+**目的:** Wails から subprocess で呼べる CLI を整備
 
 **実施内容:**
-- [ ] `main.py` に argparse 追加（`--output json` / `--download <id>`）
-- [ ] `build_tree()` の結果を stdout に JSON 出力
-- [ ] PDF ダウンロードをコマンドライン引数で指定可能に
-- [ ] メッセージ一覧取得の CLI 対応
+- [x] `crawler.py` 新規作成: `build_tree()` でダウンロードなしのJSON ツリー構築
+- [x] `cli.py` 新規作成: argparse で tree / download / check-credentials / set-credentials
+- [x] `_SuppressStdout` で既存コードの stdout 汚染を遮断
 
-**結果:** 未着手
+**結果:** ✅ 完了 (コミット: 8d682f6)
 
 ---
 
-### [Phase 2] Wails プロジェクト初期化
-**ブランチ:** `feature/wails-init`
-**目的:** Wails + Svelte のデスクトップアプリ雛形を作成
+### [Phase 2-4] Wails GUI 初期実装
+**ブランチ:** `feature/wails-gui`
+**目的:** Wails + Svelte のデスクトップアプリ基本実装
 
 **実施内容:**
-- [ ] `wails init -n webclass-gui -t svelte`
-- [ ] Go バインディング: Python subprocess 呼び出し
-- [ ] JSON パースして Svelte に渡す構造定義
+- [x] `wails init -n webclass-gui -t svelte`
+- [x] `app.go`: Go バインディング実装（CheckCredentials / SetCredentials / GetTree / DownloadPDF）
+- [x] `App.svelte`: ログイン → ローディング → メインレイアウトの状態管理
+- [x] `lib/Login.svelte`: 初回認証情報入力フォーム
+- [x] `lib/TreePanel.svelte`: 時間割→コース→セクション→コンテンツの3階層ツリー
+- [x] `lib/ContentPanel.svelte`: textbook (章リスト) / assignment (PDF) / error 表示
 
-**結果:** 未着手
-
----
-
-### [Phase 3] 左ペインツリーUI
-**ブランチ:** `feature/tree-ui`
-**目的:** 時間割→科目→教材の3階層ツリーを左ペインに表示
-
-**実施内容:**
-- [ ] Svelte ツリーコンポーネント実装
-- [ ] 展開/折りたたみ
-- [ ] 締切バッジ・新着メッセージバッジ
-
-**結果:** 未着手
-
----
-
-### [Phase 4] 右ペインコンテンツ表示
-**ブランチ:** `feature/content-view`
-**目的:** 選択ノードに応じて PDF ビューワー / メッセージ一覧を表示
-
-**実施内容:**
-- [ ] PDF インライン表示（Wails の webview 活用）
-- [ ] メッセージ一覧・詳細表示
-- [ ] 課題提出フォーム（PDF アップロード）
-
-**結果:** 未着手
+**結果:** ✅ ビルド成功
 
 ---
 
