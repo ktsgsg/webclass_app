@@ -15,11 +15,11 @@
     loading = false
   }
 
-  async function openPDF(query) {
+  async function openPDF(query, contentName, fileName) {
     loading = true
     error = ''
     try {
-      const b64 = await FetchPDF(query)
+      const b64 = await FetchPDF(query, contentName, fileName)
       const binary = atob(b64)
       const arr = new Uint8Array(binary.length)
       for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i)
@@ -56,7 +56,7 @@
       {#if pdfBytes}
         <PdfViewer bytes={pdfBytes} />
       {:else}
-        <button class="btn-primary" on:click={() => openPDF(node.download_query)} disabled={loading}>
+        <button class="btn-primary" on:click={() => openPDF(node.download_query, node.name, node.name)} disabled={loading}>
           {loading ? '取得中...' : 'PDFを表示'}
         </button>
         {#if error}<p class="error">{error}</p>{/if}
@@ -74,7 +74,7 @@
             <li>
               <button
                 class="chapter-btn"
-                on:click={() => openPDF(item.query)}
+                on:click={() => openPDF(item.query, node.name, item.chapter)}
                 disabled={loading}
               >
                 {item.chapter}

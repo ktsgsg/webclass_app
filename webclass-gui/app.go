@@ -2,8 +2,6 @@ package main
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -125,36 +123,48 @@ func (a *App) DownloadPDF(query, savePath string) error {
 	return err
 }
 
-// GetCacheDir は PDF キャッシュディレクトリのパスを返す
-func (a *App) GetCacheDir() string {
+// GetSaveDir は PDF 保存先のベースディレクトリを返す
+func (a *App) GetSaveDir() string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".webclass-gui", "cache")
+	return filepath.Join(home, "Documents", "WebClass")
 }
 
-// FetchPDF はクエリの PDF をバイト列で返す。
-// キャッシュ (GetCacheDir/<sha256(query)>.pdf) があればそれを返し、
-// なければ Python CLI でダウンロードしてキャッシュに保存する。
-func (a *App) FetchPDF(query string) ([]byte, error) {
-	cacheDir := a.GetCacheDir()
-	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+// sanitize はファイル名に使えない文字を _ に置換する
+func sanitize(s string) string {
+	result := make([]rune, 0, len(s))
+	for _, r := range s {
+		switch {
+		case r == '/' || r == '\\' || r == ':' || r == '*' ||
+			r == '?' || r == '"' || r == '<' || r == '>' || r == '|':
+			result = append(result, '_')
+		default:
+			result = append(result, r)
+		}
+	}
+	return string(result)
+}
+
+// FetchPDF は PDF をバイト列で返す。
+// ~/Documents/WebClass/<contentName>/<fileName>.pdf にキャッシュし、
+// 存在すればそれを読み込み、なければダウンロードして保存する。
+func (a *App) FetchPDF(query, contentName, fileName string) ([]byte, error) {
+	dir := filepath.Join(a.GetSaveDir(), sanitize(contentName))
+	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return nil, err
 	}
+	savePath := filepath.Join(dir, sanitize(fileName)+".pdf")
 
-	sum := sha256.Sum256([]byte(query))
-	cachePath := filepath.Join(cacheDir, hex.EncodeToString(sum[:])+".pdf")
-
-	// キャッシュヒット
-	if data, err := os.ReadFile(cachePath); err == nil && len(data) >= 4 && string(data[:4]) == "%PDF" {
+	if data, err := os.ReadFile(savePath); err == nil && len(data) >= 4 && string(data[:4]) == "%PDF" {
 		return data, nil
 	}
 
-	if _, err := a.runCLI("download", "--query", query, "--path", cachePath); err != nil {
+	if _, err := a.runCLI("download", "--query", query, "--path", savePath); err != nil {
 		return nil, err
 	}
-	return os.ReadFile(cachePath)
+	return os.ReadFile(savePath)
 }
 
-// ClearPDFCache はキャッシュ済みPDFを全削除する
-func (a *App) ClearPDFCache() error {
-	return os.RemoveAll(a.GetCacheDir())
+// ClearSavedPDFs は保存済みPDFを全削除する
+func (a *App) ClearSavedPDFs() error {
+	return os.RemoveAll(a.GetSaveDir())
 }
