@@ -128,3 +128,20 @@ func (a *App) GetCacheDir() string {
 	home, _ := os.UserHomeDir()
 	return filepath.Join(home, ".webclass-gui", "cache")
 }
+
+// FetchPDF はクエリの PDF をダウンロードしてバイト列で返す。
+// Wails は []byte を JS 側で base64 化された配列として渡すため、フロント側で
+// Uint8Array → Blob → URL.createObjectURL で表示できる。
+func (a *App) FetchPDF(query string) ([]byte, error) {
+	cacheDir := a.GetCacheDir()
+	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
+		return nil, err
+	}
+	tmpPath := filepath.Join(cacheDir, fmt.Sprintf("tmp_%d.pdf", os.Getpid()))
+	defer os.Remove(tmpPath)
+
+	if _, err := a.runCLI("download", "--query", query, "--path", tmpPath); err != nil {
+		return nil, err
+	}
+	return os.ReadFile(tmpPath)
+}

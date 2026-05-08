@@ -1,36 +1,41 @@
 <script>
-  import { DownloadPDF, GetCacheDir } from '../../wailsjs/go/main/App.js'
+  import { FetchPDF } from '../../wailsjs/go/main/App.js'
 
   export let node  // 選択されたコンテンツノード
 
   let loading = false
-  let pdfPath = null
+  let pdfUrl = null
   let error = ''
+  let prevUrl = null
 
-  // ノードが変わったらリセット
+  // ノードが変わったら前回の Blob URL を解放してリセット
   $: if (node) {
-    pdfPath = null
+    if (prevUrl) {
+      URL.revokeObjectURL(prevUrl)
+      prevUrl = null
+    }
+    pdfUrl = null
     error = ''
     loading = false
   }
 
-  async function openPDF(query, filename) {
+  async function openPDF(query) {
     loading = true
     error = ''
     try {
-      const cacheDir = await GetCacheDir()
-      const savePath = `${cacheDir}/${filename}.pdf`
-      await DownloadPDF(query, savePath)
-      pdfPath = savePath
+      const bytes = await FetchPDF(query)
+      // Wails は []byte を base64 文字列で返す
+      const binary = atob(bytes)
+      const arr = new Uint8Array(binary.length)
+      for (let i = 0; i < binary.length; i++) arr[i] = binary.charCodeAt(i)
+      const blob = new Blob([arr], { type: 'application/pdf' })
+      pdfUrl = URL.createObjectURL(blob)
+      prevUrl = pdfUrl
     } catch (e) {
       error = 'PDFの取得に失敗しました: ' + e
     } finally {
       loading = false
     }
-  }
-
-  function safeFilename(s) {
-    return s.replace(/[^a-zA-Z0-9぀-鿿_-]/g, '_')
   }
 </script>
 
@@ -55,14 +60,10 @@
   {:else if node.type === 'assignment'}
     <div class="assignment-view">
       <h2>📝 {node.name}</h2>
-      {#if pdfPath}
-        <iframe
-          title={node.name}
-          src="file://{pdfPath}"
-          class="pdf-frame"
-        ></iframe>
+      {#if pdfUrl}
+        <iframe title={node.name} src={pdfUrl} class="pdf-frame"></iframe>
       {:else}
-        <button class="btn-primary" on:click={() => openPDF(node.download_query, safeFilename(node.name))} disabled={loading}>
+        <button class="btn-primary" on:click={() => openPDF(node.download_query)} disabled={loading}>
           {loading ? '取得中...' : 'PDFを表示'}
         </button>
         {#if error}<p class="error">{error}</p>{/if}
@@ -72,19 +73,15 @@
   {:else if node.type === 'textbook'}
     <div class="textbook-view">
       <h2>📄 {node.name}</h2>
-      {#if pdfPath}
-        <iframe
-          title={node.name}
-          src="file://{pdfPath}"
-          class="pdf-frame"
-        ></iframe>
+      {#if pdfUrl}
+        <iframe title={node.name} src={pdfUrl} class="pdf-frame"></iframe>
       {:else}
         <ul class="chapter-list">
           {#each node.items as item, i}
             <li>
               <button
                 class="chapter-btn"
-                on:click={() => openPDF(item.query, safeFilename(node.name + '_' + item.chapter))}
+                on:click={() => openPDF(item.query)}
                 disabled={loading}
               >
                 {item.chapter}
