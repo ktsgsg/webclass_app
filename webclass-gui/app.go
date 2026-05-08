@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -129,19 +131,30 @@ func (a *App) GetCacheDir() string {
 	return filepath.Join(home, ".webclass-gui", "cache")
 }
 
-// FetchPDF はクエリの PDF をダウンロードしてバイト列で返す。
-// Wails は []byte を JS 側で base64 化された配列として渡すため、フロント側で
-// Uint8Array → Blob → URL.createObjectURL で表示できる。
+// FetchPDF はクエリの PDF をバイト列で返す。
+// キャッシュ (GetCacheDir/<sha256(query)>.pdf) があればそれを返し、
+// なければ Python CLI でダウンロードしてキャッシュに保存する。
 func (a *App) FetchPDF(query string) ([]byte, error) {
 	cacheDir := a.GetCacheDir()
 	if err := os.MkdirAll(cacheDir, 0o755); err != nil {
 		return nil, err
 	}
-	tmpPath := filepath.Join(cacheDir, fmt.Sprintf("tmp_%d.pdf", os.Getpid()))
-	defer os.Remove(tmpPath)
 
-	if _, err := a.runCLI("download", "--query", query, "--path", tmpPath); err != nil {
+	sum := sha256.Sum256([]byte(query))
+	cachePath := filepath.Join(cacheDir, hex.EncodeToString(sum[:])+".pdf")
+
+	// キャッシュヒット
+	if data, err := os.ReadFile(cachePath); err == nil && len(data) >= 4 && string(data[:4]) == "%PDF" {
+		return data, nil
+	}
+
+	if _, err := a.runCLI("download", "--query", query, "--path", cachePath); err != nil {
 		return nil, err
 	}
-	return os.ReadFile(tmpPath)
+	return os.ReadFile(cachePath)
+}
+
+// ClearPDFCache はキャッシュ済みPDFを全削除する
+func (a *App) ClearPDFCache() error {
+	return os.RemoveAll(a.GetCacheDir())
 }
